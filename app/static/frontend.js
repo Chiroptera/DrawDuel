@@ -1,3 +1,6 @@
+// http://www.williammalone.com/articles/create-html5-canvas-javascript-drawing-app/#demo-simple
+
+
 var paint = false;
 var maxPx = 50;
 var countPx = 0;
