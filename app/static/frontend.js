@@ -6,7 +6,9 @@ var maxPx = 50;
 var countPx = 0;
 var myTurn = false;
 
-var socket = io('http://localhost:5000');
+console.log('connecting to websocket in: ' + document.domain + ':' + location.port)
+
+var socket = io('http://' + document.domain + ':' + location.port);
 socket.on('connect', function(){
     console.log('registering...');
     socket.emit('register');
@@ -26,7 +28,6 @@ socket.on('your_turn', function(){
 });
 
 socket.on('disconnect', function(){});
-
 
 context = document.getElementById('drawCanvas').getContext("2d");
 
