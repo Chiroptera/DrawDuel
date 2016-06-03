@@ -1,13 +1,19 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session, flash, redirect,\
+                  url_for
 from flask_socketio import SocketIO, emit
+
 import uuid
-from random import choice
 import logging
 
-logger = logging.getLogger('simple_example')
+from game_manage import User, BattleRoom
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                     LOGGING SETUP
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
-fh = logging.FileHandler('spam.log')
+fh = logging.FileHandler('app.log')
 fh.setLevel(logging.INFO)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
@@ -20,61 +26,154 @@ fh.setFormatter(formatter)
 logger.addHandler(ch)
 logger.addHandler(fh)
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                           APP SETUP
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app)
+app.logger.addHandler(ch)
+app.logger.addHandler(fh)
+# FlaskSession.Session(app)
+# FlaskSession.init_app(app)
+socketio = SocketIO(app, logger=logger)
+
 
 canvasCount = 0
 currentDrawing = list()
 canvas = {0: currentDrawing}
 
-current_client = 0
-clients = list()
+users = dict()
+battle_rooms = dict()
+waiting_rooms = list()
+
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    track_user()
+    return render_template('frontpage.html')
 
 
-@app.route('/get_uuid')
-def get_uuid():
-    return uuid.uuid4().get_hex()
+@app.route('/create_battleroom')
+def create_battleroom():
+    # add user to battle id
+    track_user()
+    new_room_uuid = uuid.uuid4().hex
+    battle_rooms[new_room_uuid] = BattleRoom(new_room_uuid)
+    logger.debug('created battleroom: {}'.format(new_room_uuid))
+    return redirect('/battle_room/{}'.format(new_room_uuid))
+
+
+@app.route('/test')
+def test():
+    return redirect(url_for('index'))
+
+
+@app.route('/find_opponent')
+def find_opponent():
+    logger.debug('find oponent not implemented yet')
+    return redirect(url_for('index'))
+
+
+@app.route('/battle_room/<battle_id>')
+def battle_room(battle_id):
+    curr_user = track_user()
+
+    if not curr_user:
+        logger.debug('user not tracked yet, redirecting to main page')
+        return redirect(url_for('index'))
+
+    curr_battleroom = battle_rooms.get(battle_id)
+    print('curr battlerrom: ', curr_battleroom)
+    if not curr_battleroom:
+        logger.debug('battleroom doesn\'t exist , redirecting to main page')
+        return redirect(url_for('index'))
+
+    # users[user] = battle_id
+    curr_battleroom.add_user(curr_user)
+
+    return render_template('canvas_room.html')
+
+
+@app.route('/set_username')
+def set_username():
+    track_user()
+    session['username'] = request.form['username']
+    users[session['uuid']].username = request.form['username']
+
+
+def load_user():
+    if 'uuid' not in session:
+        return None
+    return users.get(session['uuid'], None)
+
+
+def track_user():
+    user_uuid = session.get('uuid')
+    if not user_uuid:
+        user_uuid = uuid.uuid4().hex
+        session['uuid'] = user_uuid
+
+    user = users.get(user_uuid)
+    if not user:
+        user = User(user_uuid)
+        users[user_uuid] = user
+
+    logger.debug('user being tracked: {}'.format(user.uuid))
+
+    return user
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                      CANVAS WEBSOCKET
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
 @socketio.on('disconnect')
 def disconnected():
-    global current_client
-    logger.debug('Client disconnected. Number of clients: {}'.format(len(clients)))
-    clients.remove(request.sid)
-
-    if current_client >= len(clients):
-        current_client -= 1
+    logger.debug('User websocket disconnected. User uuid: {}'.format(session['uuid']))
+    # clients.remove(request.sid)
 
 
 @socketio.on('register')
-def register_client():
-    global current_client
+def register_client(message):
 
-    logger.debug('client registered: {}'.format(request.sid))
+    logger.debug('user registered; user: {}  sid: {}'.format(session['uuid'], request.sid))
 
-    clients.append(request.sid)
+    curr_user = load_user()
+    if not curr_user:
+        logger.debug('user not tracked yet, redirecting to main page')
+        return redirect(url_for('index'))
 
-    logger.debug('Client registered. Number of clients: {}'.format(len(clients)))
+    curr_battleroom = battle_rooms.get(message['battleroom'])
+    if not curr_battleroom:
+        logger.debug('battleroom doesn\'t exist , redirecting to main page')
+        return redirect(url_for('index'))
 
-    if len(clients) == 2:
-        chosenClient = clients[current_client]
-        socketio.emit('your_turn', room=chosenClient)
+    curr_user.register(curr_battleroom.uuid, request.sid)
+    curr_battleroom.register(curr_user.uuid, request.sid)
+
+    if curr_battleroom.ready():
+        socketio.emit('your_turn', room=curr_battleroom.get_curr_player())
+    else:
+        socketio.emit('server message', {'msg': u'Waiting for another player...'},
+                      room=request.sid)
 
 
 @socketio.on('im_done')
-def change_client():
-    global canvasCount, current_client
+def change_client(msg):
+    curr_user = load_user()
+    if not curr_user:
+        logger.debug('user not tracked yet, redirecting to main page')
+        return redirect(url_for('index'))
+
+    curr_battleroom = battle_rooms.get(msg['battleroom'])
+    if not curr_battleroom:
+        logger.debug('battleroom doesn\'t exist , redirecting to main page')
+        return redirect(url_for('index'))
 
     logger.debug('client done: {}'.format(request.sid))
 
-    current_client += 1
-    if current_client >= len(clients):
-        current_client = 0
+    curr_battleroom
 
     logger.debug('current client: {}'.format(current_client))
     logger.debug('clients len: {}'.format(len(clients)))

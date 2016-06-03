@@ -1,20 +1,47 @@
 // http://www.williammalone.com/articles/create-html5-canvas-javascript-drawing-app/#demo-simple
 
+var battleroom = location.pathname.match(/([^\/]*)\/*$/)[1];
+console.log('battleroom: ' + battleroom);
 
-var paint = false;
-var maxPx = 50;
-var countPx = 0;
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+                                MANAGE
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+console.log('connecting to websocket in: ' + document.domain + ':' + location.port);
+var socket = io('http://' + document.domain + ':' + location.port);
+
+socket.on('connect', function(){
+    console.log('connected. registering...');
+    $('#chat').append('<br>' + $('<div/>').text('Connected. Registering...').html());
+    socket.emit('register', {battleroom: battleroom});
+});
+
+socket.on('server message', function(data){
+  $('#chat').append('<br> <font color="red">' + $('</font><div/>').text(data.msg).html());
+});
+
+socket.on('disconnect', function(){
+  console.log('disconnected.');
+  $('#chat').append('<br>' + $('<div/>').text('Disconnected...').html());
+});
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+                                GAME
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+var maxPx = 50;  // maximum pixels that the player can draw per turn
+var countPx = 0;  // keep track of number of pixels drawn in current turn
 var myTurn = false;
 
-console.log('connecting to websocket in: ' + document.domain + ':' + location.port)
+var clickX = new Array();
+var clickY = new Array();
+var clickDrag = new Array();
+var paint;
 
-var socket = io('http://' + document.domain + ':' + location.port);
-socket.on('connect', function(){
-    console.log('registering...');
-    socket.emit('register');
-});
-socket.on('event', function(data){});
+var color = "#df4b26";
+var line_join = "round";
+var line_width = 5;
 
+// receive points from server
 socket.on('px2client', function(data){
     console.log(data);
     addClickServer(data.x, data.y, data.dragging)
@@ -23,11 +50,10 @@ socket.on('px2client', function(data){
 
 socket.on('your_turn', function(){
     console.log('it\'s your turn now');
+    $('#chat').append('<br>' + $('<div/>').text('It\'s your turn now.').html());
     myTurn = true;
     countPx = 0;
 });
-
-socket.on('disconnect', function(){});
 
 context = document.getElementById('drawCanvas').getContext("2d");
 
@@ -55,11 +81,8 @@ $('#drawCanvas').mouseleave(function(e){
   paint = false;
 });
 
-var clickX = new Array();
-var clickY = new Array();
-var clickDrag = new Array();
-var paint;
 
+// draw points received from server
 function addClickServer(x, y, dragging)
 {
   clickX.push(x);
@@ -67,6 +90,8 @@ function addClickServer(x, y, dragging)
   clickDrag.push(dragging);
 }
 
+
+// draw points received locally
 function addClick(x, y, dragging)
 {
   countPx += 1;
@@ -85,20 +110,22 @@ function addClick(x, y, dragging)
   }
 }
 
-function redraw(){
-  context.clearRect(0, 0, context.canvas.width, context.canvas.height); // Clears the canvas
 
-  context.strokeStyle = "#df4b26";
-  context.lineJoin = "round";
-  context.lineWidth = 5 ;
+function redraw(){
+  // Clears the canvas
+  context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+
+  context.strokeStyle = color;
+  context.lineJoin = line_join;
+  context.lineWidth = line_width;
 
   for(var i=0; i < clickX.length; i++) {
     context.beginPath();
     if(clickDrag[i] && i){
       context.moveTo(clickX[i-1], clickY[i-1]);
-     }else{
+    } else {
        context.moveTo(clickX[i]-1, clickY[i]);
-     }
+    }
      context.lineTo(clickX[i], clickY[i]);
      context.closePath();
      context.stroke();
