@@ -25,6 +25,11 @@ socket.on('disconnect', function(){
   $('#chat').append('<br>' + $('<div/>').text('Disconnected...').html());
 });
 
+socket.on('expired', function(){
+  console.log('battleroom expired. reloading page...');
+  location.reload();
+});
+
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
                                 GAME
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -105,7 +110,7 @@ function addClick(x, y, dragging)
   socket.emit('px2server', { x: x, y: y, dragging: dragging});
 
   if (countPx >= maxPx){
-    socket.emit('im_done');
+    socket.emit('im_done', {battleroom: battleroom});
     myTurn = false;
   }
 }

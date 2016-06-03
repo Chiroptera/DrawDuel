@@ -58,10 +58,10 @@ def index():
 def create_battleroom():
     # add user to battle id
     track_user()
-    new_room_uuid = uuid.uuid4().hex
-    battle_rooms[new_room_uuid] = BattleRoom(new_room_uuid)
-    logger.debug('created battleroom: {}'.format(new_room_uuid))
-    return redirect('/battle_room/{}'.format(new_room_uuid))
+    newBR = BattleRoom()
+    battle_rooms[newBR.uuid] = newBR
+    logger.debug('created battleroom: {}'.format(newBR.uuid))
+    return redirect('/battle_room/{}'.format(newBR.uuid))
 
 
 @app.route('/test')
@@ -81,16 +81,17 @@ def battle_room(battle_id):
 
     if not curr_user:
         logger.debug('user not tracked yet, redirecting to main page')
-        return redirect(url_for('index'))
+        # return redirect(url_for('index'))
 
     curr_battleroom = battle_rooms.get(battle_id)
-    print('curr battlerrom: ', curr_battleroom)
     if not curr_battleroom:
         logger.debug('battleroom doesn\'t exist , redirecting to main page')
         return redirect(url_for('index'))
 
     # users[user] = battle_id
-    curr_battleroom.add_user(curr_user)
+    logger.debug('added user {} to battleroom {}'.format(curr_user.uuid,
+                                                         curr_battleroom.uuid))
+    curr_battleroom.add_user(curr_user.uuid)
 
     return render_template('canvas_room.html')
 
@@ -134,66 +135,79 @@ def disconnected():
     # clients.remove(request.sid)
 
 
+def server_message(recipient, msg):
+    socketio.emit('server message', {'msg': unicode(msg)},
+                  room=recipient)
+
+
 @socketio.on('register')
 def register_client(message):
-
     logger.debug('user registered; user: {}  sid: {}'.format(session['uuid'], request.sid))
 
     curr_user = load_user()
     if not curr_user:
         logger.debug('user not tracked yet, redirecting to main page')
-        return redirect(url_for('index'))
+        socketio.emit('expired', room=request.sid)
+        return
 
     curr_battleroom = battle_rooms.get(message['battleroom'])
     if not curr_battleroom:
         logger.debug('battleroom doesn\'t exist , redirecting to main page')
-        return redirect(url_for('index'))
+        socketio.emit('expired', room=request.sid)
+        return
 
     curr_user.register(curr_battleroom.uuid, request.sid)
-    curr_battleroom.register(curr_user.uuid, request.sid)
+    if not curr_battleroom.register(curr_user.uuid, request.sid):
+        logger.debug('user not in battleroom')
 
     if curr_battleroom.ready():
-        socketio.emit('your_turn', room=curr_battleroom.get_curr_player())
+        logger.debug('battleroom ready, current player: {}'.format(curr_battleroom.current_player))
+        try:
+            socketio.emit('your_turn', room=curr_battleroom.get_curr_player_ws())
+        except:
+            logger.debug('\n\n\nyour turn failed; current_player: {}\n\n\n'.format(curr_battleroom.current_player))
+
     else:
-        socketio.emit('server message', {'msg': u'Waiting for another player...'},
-                      room=request.sid)
+        server_message(request.sid, 'Waiting for players...')
 
 
 @socketio.on('im_done')
-def change_client(msg):
+def change_client(message):
     curr_user = load_user()
     if not curr_user:
         logger.debug('user not tracked yet, redirecting to main page')
-        return redirect(url_for('index'))
+        socketio.emit('expired', room=request.sid)
+        return
 
-    curr_battleroom = battle_rooms.get(msg['battleroom'])
+    curr_battleroom = battle_rooms.get(message['battleroom'])
     if not curr_battleroom:
         logger.debug('battleroom doesn\'t exist , redirecting to main page')
-        return redirect(url_for('index'))
+        socketio.emit('expired', room=request.sid)
+        return
 
-    logger.debug('client done: {}'.format(request.sid))
+    logger.debug('player done: user: {}   sid: {}'.format(curr_user.uuid,
+                                                          request.sid))
 
-    curr_battleroom
+    curr_battleroom.turn_end()
+    socketio.emit('your_turn', room=curr_battleroom.get_curr_player_ws())
 
-    logger.debug('current client: {}'.format(current_client))
-    logger.debug('clients len: {}'.format(len(clients)))
-    nextClient = clients[current_client]
-    socketio.emit('your_turn', room=nextClient)
 
-    canvasCount += 1
-    currentDrawing = list()
-    canvas[canvasCount] = currentDrawing
+def find_battleroom_of_ws(ws):
+    for br in battle_rooms.values():
+        if ws in br.all_ws():
+            return br
 
 
 @socketio.on('px2server')
 def recv_pixels(msg):
     logger.debug('got pixel: {}'.format(msg))
-    currentDrawing.append((msg['x'], msg['y'], msg.get('dragging', False)))
 
-    otherClients = [c for c in clients if c != request.sid]
-    for client in otherClients:
-        socketio.emit('px2client', msg, room=client)
+    BR = find_battleroom_of_ws(request.sid)
+    BR.add_point((msg['x'], msg['y'], msg.get('dragging', False)))
 
+    for ws in BR.all_ws():
+        if ws != request.sid:
+            socketio.emit('px2client', msg, room=ws)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)

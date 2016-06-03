@@ -9,6 +9,9 @@ Message with some information for the client.
 ### px2client
 Message with a point as payload.
 
+### expired
+Message with no payload to inform the client that the Battleroom expired. The client will automatically reload the page.
+
 ## from client
 ### im_done
 Message with no payload to indicate that the client ended its turn.
