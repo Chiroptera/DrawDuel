@@ -1,4 +1,8 @@
 // http://www.williammalone.com/articles/create-html5-canvas-javascript-drawing-app/#demo-simple
+//touch events rom:
+// https://software.intel.com/en-us/xdk/article/touch-drawing-app-using-html5-canvas
+// we use the document.ready so that no code is executed before the page is loaded
+$(document).ready(function(){
 
 var battleroom = location.pathname.match(/([^\/]*)\/*$/)[1];
 console.log('battleroom: ' + battleroom);
@@ -62,12 +66,16 @@ socket.on('your_turn', function(){
 
 context = document.getElementById('drawCanvas').getContext("2d");
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+                                MOUSE FUNCTIONS
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 $('#drawCanvas').mousedown(function(e){
   var mouseX = e.pageX - this.offsetLeft;
   var mouseY = e.pageY - this.offsetTop;
 
   paint = true;
-  addClick(e.pageX - this.offsetLeft, e.pageY - this.offsetTop);
+  addClick(mouseX, mouseY);
   redraw();
 });
 
@@ -86,6 +94,38 @@ $('#drawCanvas').mouseleave(function(e){
   paint = false;
 });
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+                                TOUCH FUNCTIONS
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+// $('#drawCanvas').touchstart(function(e){
+//   var mouseX = e.originalEvent.touches[0].pageX - this.offsetLeft;
+//   var mouseY = e.originalEvent.touches[0].pageY - this.offsetTop;
+
+//   paint = true;
+//   addClick(mouseX, mouseY);
+//   redraw();
+// });
+
+// $('#drawCanvas').touchmove(function(e){
+//   if(paint){
+//     var mouseX = e.originalEvent.touches[0].pageX - this.offsetLeft;
+//     var mouseY = e.originalEvent.touches[0].pageY - this.offsetTop;
+//     addClick(mouseX, mouseY, true);
+//     redraw();
+//   }
+// });
+
+// $('#drawCanvas').touchend(function(e){
+//   paint = false;
+// });
+
+// $('#drawCanvas').touchleave(function(e){
+//   paint = false;
+// });
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+                                DRAWING FUNCTIONS
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 // draw points received from server
 function addClickServer(x, y, dragging)
@@ -136,3 +176,5 @@ function redraw(){
      context.stroke();
   }
 }
+
+});

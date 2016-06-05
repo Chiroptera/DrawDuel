@@ -91,9 +91,11 @@ def battle_room(battle_id):
     # users[user] = battle_id
     logger.debug('added user {} to battleroom {}'.format(curr_user.uuid,
                                                          curr_battleroom.uuid))
-    curr_battleroom.add_user(curr_user.uuid)
 
-    return render_template('canvas_room.html')
+    if curr_battleroom.add_user(curr_user.uuid):
+        return render_template('canvas_room.html')
+
+    return redirect(url_for('index'))
 
 
 @app.route('/set_username')
@@ -136,7 +138,7 @@ def disconnected():
 
 
 def server_message(recipient, msg):
-    socketio.emit('server message', {'msg': unicode(msg)},
+    socketio.emit('server message', {'msg': str(msg)},
                   room=recipient)
 
 
@@ -156,9 +158,12 @@ def register_client(message):
         socketio.emit('expired', room=request.sid)
         return
 
-    curr_user.register(curr_battleroom.uuid, request.sid)
     if not curr_battleroom.register(curr_user.uuid, request.sid):
         logger.debug('user not in battleroom')
+        socketio.emit('expired', room=request.sid)
+        return
+
+    curr_user.register(curr_battleroom.uuid, request.sid)
 
     if curr_battleroom.ready():
         logger.debug('battleroom ready, current player: {}'.format(curr_battleroom.current_player))

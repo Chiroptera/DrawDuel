@@ -12,34 +12,41 @@ class BattleRoom:
 
         self.players = []
         self.n_players = 0
-        self.n_registered = 0
 
-        self.all_subscribers = {}
+        self.players_ws = {}
 
-        self.spectators = []  # for future implementation
+    def is_full(self):
+        if self.n_players == 2:
+            return True
+        return False
 
     def all_ws(self):
-        return self.all_subscribers.values()
+        return self.players_ws.values()
 
-    def add_user(self, player):
-        if player not in self.players:
-            self.all_subscribers[player] = False
-            self.players.append(player)
+    def add_user(self, user):
+
+        if user in self.players:
+            return True
+
+        if self.n_players < 2:
+            self.players_ws[user] = False
+            self.players.append(user)
             self.n_players += 1
+            return True
+
+        return False
 
     def remove_user(self, player):
         if player in self.players:
             del self.players[player]
-            self.players.remove(all_subscribers)
+            self.players.remove(player)
             self.n_players -= 1
-            self.n_registered -= 1
             return True
         return False
 
     def register(self, player, ws):
         if player in self.players:
-            self.all_subscribers[player] = ws
-            self.n_registered += 1
+            self.players_ws[player] = ws
             return True
         return False
 
@@ -52,13 +59,13 @@ class BattleRoom:
         self.canvas[self.turn] = []
 
     def ready(self):
-        if self.n_registered >= 2:
-            self.current_player = randint(0, self.n_registered - 1)
+        if len(self.players_ws) == 2:
+            self.current_player = randint(0, len(self.players_ws) - 1)
             return True
         return False
 
     def get_curr_player_ws(self):
-        ws = self.all_subscribers[self.players[self.current_player]]
+        ws = self.players_ws[self.players[self.current_player]]
         if ws:
             return ws
         else:
