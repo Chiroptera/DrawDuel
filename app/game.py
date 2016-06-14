@@ -1,43 +1,13 @@
-from flask import Flask, render_template, request, session, flash, redirect,\
-                  url_for
+from flask import render_template, request, session, flash, redirect, url_for
 from flask_socketio import SocketIO, emit
 
 import uuid
-import logging
 
-from game_manage import User, BattleRoom
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#                     LOGGING SETUP
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+from app import app, logger
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-# create file handler which logs even debug messages
-fh = logging.FileHandler('app.log')
-fh.setLevel(logging.INFO)
-# create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-# create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-fh.setFormatter(formatter)
-# add the handlers to logger
-logger.addHandler(ch)
-logger.addHandler(fh)
+from .game_manage import User, BattleRoom
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#                           APP SETUP
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
-app.logger.addHandler(ch)
-app.logger.addHandler(fh)
-# FlaskSession.Session(app)
-# FlaskSession.init_app(app)
 socketio = SocketIO(app, logger=logger)
-
 
 canvasCount = 0
 currentDrawing = list()
@@ -164,6 +134,12 @@ def register_client(message):
         return
 
     curr_user.register(curr_battleroom.uuid, request.sid)
+
+    # send all pixels in canvas to registered client
+    for turn, points in curr_battleroom.canvas.items():
+        for point in points:
+            msg = {'x': point[0], 'y': point[1], 'dragging': point[2]}
+            socketio.emit('px2client', msg, room=request.sid)
 
     if curr_battleroom.ready():
         logger.debug('battleroom ready, current player: {}'.format(curr_battleroom.current_player))

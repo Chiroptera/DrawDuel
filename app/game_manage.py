@@ -15,6 +15,8 @@ class BattleRoom:
 
         self.players_ws = {}
 
+        self.started = False
+
     def is_full(self):
         if self.n_players == 2:
             return True
@@ -59,8 +61,11 @@ class BattleRoom:
         self.canvas[self.turn] = []
 
     def ready(self):
+        if self.started:
+            return True
         if len(self.players_ws) == 2:
             self.current_player = randint(0, len(self.players_ws) - 1)
+            self.started = True
             return True
         return False
 
