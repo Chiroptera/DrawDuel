@@ -9,10 +9,6 @@ from .game_manage import User, BattleRoom
 
 socketio = SocketIO(app, logger=logger)
 
-canvasCount = 0
-currentDrawing = list()
-canvas = {0: currentDrawing}
-
 users = dict()
 battle_rooms = dict()
 waiting_rooms = list()
@@ -63,7 +59,8 @@ def battle_room(battle_id):
                                                          curr_battleroom.uuid))
 
     if curr_battleroom.add_user(curr_user.uuid):
-        return render_template('canvas_room.html')
+        return render_template('canvas_room.html', canvas_width=800,
+                                                   canvas_height=500)
 
     return redirect(url_for('index'))
 
@@ -136,10 +133,14 @@ def register_client(message):
     curr_user.register(curr_battleroom.uuid, request.sid)
 
     # send all pixels in canvas to registered client
-    for turn, points in curr_battleroom.canvas.items():
-        for point in points:
-            msg = {'x': point[0], 'y': point[1], 'dragging': point[2]}
-            socketio.emit('px2client', msg, room=request.sid)
+    # for turn, points in curr_battleroom.canvas.items():
+    #     for point in points:
+    #         msg = {'x': point[0], 'y': point[1], 'dragging': point[2]}
+    #         socketio.emit('px2client', msg, room=request.sid)
+
+    logger.debug('battle room type: {}'.format(type(curr_battleroom)))
+    for point in curr_battleroom:
+        socketio.emit('px2client', point.make_message(), room=request.sid)
 
     if curr_battleroom.ready():
         logger.debug('battleroom ready, current player: {}'.format(curr_battleroom.current_player))
@@ -184,7 +185,9 @@ def recv_pixels(msg):
     logger.debug('got pixel: {}'.format(msg))
 
     BR = find_battleroom_of_ws(request.sid)
-    BR.add_point((msg['x'], msg['y'], msg.get('dragging', False)))
+    # BR.add_point((msg['x'], msg['y'], msg.get('dragging', False), msg['color'],
+    #               msg['line_width']))
+    BR.add_message_point(msg)
 
     for ws in BR.all_ws():
         if ws != request.sid:

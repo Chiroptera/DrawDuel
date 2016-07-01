@@ -1,18 +1,44 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Drawing Battle</title>
+{% extends "skeleton.html" %}
+{% block title %}Battleroom{% endblock %}
+{% block head %}
+    {{ super() }}
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.js"></script>
     <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
-</head>
-<body  bgcolor="#E6E6FA">
+    <script src="../static/js/jscolor.min.js"></script>
+    <script type="text/javascript" src="../static/canvasroom.js"></script>
+    <style type="text/css">
+    	#drawCanvas {
+    		border:1px solid #000000;
+    	}
 
-    <canvas id="drawCanvas" width="490" height="220" style="border:1px solid #000000;"></canvas>
+    	#chat {
+    		width: 400px;
+    		height: 420px;
+    		overflow: scroll;
+    		overflow-x:hidden;
+    	}
 
-    <script type="text/javascript" src="../static/frontend.js"></script>
+    	.col-center{
+        margin:0 auto;
+      }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+	<div class="col-center" align="center">
+
+    <canvas id="drawCanvas" width="{{canvas_width}}" height="{{canvas_height}}"></canvas>
+
+    Draw color
+    <input class="jscolor" onchange="setDrawColor(this.jscolor)" value="cc66ff">
+
+    <!-- <button class="jscolor {valueElement:'chosen-value', onFineChange:'setDrawColor(this)'}">
+      Draw color
+    </button> -->
 
 
-    <div id="chat" style="width: 400px; height: 200px; overflow: scroll; overflow-x:hidden;"><div>
-</body>
-</html>
+    <div id="chat"><div>
+	</div> <!-- col center -->
+</div> <!-- outer container -->
+{% endblock %}

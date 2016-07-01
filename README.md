@@ -2,5 +2,10 @@ TODO:
 - test with different computers/browsers/networks
 - work on improving the frontend visuals
 - work on waiting list
-- test when more users join a room after the two players
 - deal with websocket disconnection, user leaving the page, websocket reconnection
+- make routine that checks rooms that have been left empty for more than 60 seconds
+- finish colors functionality
+- test colors functionality
+- if we drag the cursor fast the current code draws more than the allowed number of pixels
+  - fix this by changing the offset
+  - count the number of pixels that will be written
